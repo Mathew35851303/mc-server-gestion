@@ -4,6 +4,8 @@ services:
     container_name: mc-admin
     ports:
       - "3002:3000"
+    networks:
+      - minecraft-forge_default
     environment:
       - NODE_ENV=production
       - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
@@ -19,10 +21,14 @@ services:
       - ADMIN_USERNAME=${ADMIN_USERNAME:-admin}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD}
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /var/run/docker.sock:/var/run/docker.sock
       - mc-admin-data:/app/data
       - minecraft-forge_minecraft-data:/minecraft-data:ro
     restart: unless-stopped
+
+networks:
+  minecraft-forge_default:
+    external: true
 
 volumes:
   mc-admin-data:
