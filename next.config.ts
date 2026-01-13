@@ -7,6 +7,8 @@ const nextConfig: NextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
+  output: "standalone",
+  serverExternalPackages: ["dockerode"],
 };
 
 export default nextConfig;
