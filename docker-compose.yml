@@ -4,10 +4,13 @@ services:
     container_name: mc-admin
     ports:
       - "3002:3000"
+    networks:
+      - cloudflared-network
     environment:
       - NODE_ENV=production
       - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
-      - NEXTAUTH_URL=${NEXTAUTH_URL:-http://localhost:3002}
+      - NEXTAUTH_URL=https://server.losnachoschipies.fr
+      - AUTH_TRUST_HOST=true
       - RCON_HOST=minecraft-forge
       - RCON_PORT=25575
       - RCON_PASSWORD=${RCON_PASSWORD}
