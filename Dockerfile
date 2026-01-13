@@ -1,7 +1,7 @@
 # Build stage
 FROM node:20-alpine AS builder
 
-# Install build dependencies for native modules (better-sqlite3, bcrypt)
+# Install build dependencies for native modules (dockerode)
 RUN apk add --no-cache python3 make g++
 
 WORKDIR /app

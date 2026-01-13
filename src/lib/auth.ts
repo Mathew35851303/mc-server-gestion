@@ -1,9 +1,5 @@
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
-import { compare, hash } from "bcrypt";
-import { db } from "./db";
-import { users } from "./db/schema";
-import { eq } from "drizzle-orm";
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   providers: [
@@ -21,50 +17,18 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         const username = credentials.username as string;
         const password = credentials.password as string;
 
-        // Find user in database
-        const user = await db.query.users.findFirst({
-          where: eq(users.username, username),
-        });
-
-        if (!user) {
-          // If no user exists and this is the default admin, create it
-          if (
-            username === process.env.ADMIN_USERNAME &&
-            password === process.env.ADMIN_PASSWORD
-          ) {
-            const passwordHash = await hash(password, 12);
-            const [newUser] = await db
-              .insert(users)
-              .values({
-                username,
-                passwordHash,
-              })
-              .returning();
-
-            return {
-              id: String(newUser.id),
-              name: newUser.username,
-            };
-          }
-          return null;
+        // Simple auth: check against environment variables
+        if (
+          username === process.env.ADMIN_USERNAME &&
+          password === process.env.ADMIN_PASSWORD
+        ) {
+          return {
+            id: "1",
+            name: username,
+          };
         }
 
-        // Verify password
-        const isValid = await compare(password, user.passwordHash);
-        if (!isValid) {
-          return null;
-        }
-
-        // Update last login
-        await db
-          .update(users)
-          .set({ lastLogin: new Date() })
-          .where(eq(users.id, user.id));
-
-        return {
-          id: String(user.id),
-          name: user.username,
-        };
+        return null;
       },
     }),
   ],

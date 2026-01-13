@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { rcon } from "@/lib/rcon";
-import { db } from "@/lib/db";
-import { commandHistory } from "@/lib/db/schema";
 import { z } from "zod";
 
 const commandSchema = z.object({
@@ -39,13 +37,6 @@ export async function POST(request: NextRequest) {
 
     // Send command via RCON
     const response = await rcon.send(command);
-
-    // Log the command
-    await db.insert(commandHistory).values({
-      command,
-      response,
-      executedBy: session.user?.name || "unknown",
-    });
 
     return NextResponse.json({
       success: true,
