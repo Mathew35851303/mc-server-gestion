@@ -115,7 +115,7 @@ export async function getContainerLogs(tail: number = 100): Promise<string> {
     if (Buffer.isBuffer(logs)) {
       return demuxDockerLogs(logs);
     }
-    return logs.toString();
+    return String(logs);
   } catch (error) {
     console.error("Error getting container logs:", error);
     return "";
