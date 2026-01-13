@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { getContainer } from "@/lib/docker";
+import { Duplex } from "stream";
 
 export const dynamic = "force-dynamic";
 
@@ -10,16 +11,18 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  let logStream: Duplex | null = null;
+
   try {
     const container = await getContainer();
 
-    const logStream = await container.logs({
+    logStream = (await container.logs({
       stdout: true,
       stderr: true,
       follow: true,
       tail: 50,
       timestamps: true,
-    });
+    })) as Duplex;
 
     const encoder = new TextEncoder();
 
@@ -45,22 +48,24 @@ export async function GET() {
           }
         };
 
-        logStream.on("data", (chunk: Buffer) => {
+        logStream!.on("data", (chunk: Buffer) => {
           buffer = Buffer.concat([buffer, chunk]);
           processBuffer();
         });
 
-        logStream.on("end", () => {
+        logStream!.on("end", () => {
           controller.close();
         });
 
-        logStream.on("error", (error: Error) => {
+        logStream!.on("error", (error: Error) => {
           console.error("Log stream error:", error);
           controller.error(error);
         });
       },
       cancel() {
-        logStream.destroy();
+        if (logStream) {
+          logStream.destroy();
+        }
       },
     });
 
