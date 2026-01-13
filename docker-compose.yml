@@ -4,8 +4,6 @@ services:
     container_name: mc-admin
     ports:
       - "3002:3000"
-    networks:
-      - cloudflared-network
     environment:
       - NODE_ENV=production
       - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
