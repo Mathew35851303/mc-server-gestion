@@ -1,0 +1,75 @@
+services:
+  minecraft:
+    image: itzg/minecraft-server:latest
+    container_name: minecraft-forge
+    ports:
+      - "25565:25565"
+      - "35920:35920/udp"
+    environment:
+      EULA: "TRUE"
+      TYPE: "FORGE"
+      VERSION: "1.20.1"
+      MEMORY: "16G"
+      MOTD: "Serveur Forge 1.20.1"
+      # RCON Configuration
+      ENABLE_RCON: "true"
+      RCON_PASSWORD: "${RCON_PASSWORD}"
+      RCON_PORT: "25575"
+      # Whitelist
+      ENABLE_WHITELIST: "true"
+      ENFORCE_WHITELIST: "true"
+    volumes:
+      - minecraft-data:/data
+    restart: unless-stopped
+    tty: true
+    stdin_open: true
+    networks:
+      - mc-network
+
+  mc-admin:
+    build: .
+    container_name: mc-admin
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
+      - NEXTAUTH_URL=${NEXTAUTH_URL:-http://localhost:3000}
+      - RCON_HOST=minecraft
+      - RCON_PORT=25575
+      - RCON_PASSWORD=${RCON_PASSWORD}
+      - MC_CONTAINER_NAME=minecraft-forge
+      - MC_PROPERTIES_PATH=/minecraft-data/server.properties
+      - DATABASE_URL=/app/data/mc-admin.db
+      - ADMIN_USERNAME=${ADMIN_USERNAME:-admin}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - mc-admin-data:/app/data
+      - minecraft-data:/minecraft-data:ro
+    depends_on:
+      - minecraft
+    restart: unless-stopped
+    networks:
+      - mc-network
+
+  filebrowser:
+    image: filebrowser/filebrowser:latest
+    container_name: filebrowser
+    ports:
+      - "8080:80"
+    command:
+      - --noauth
+    volumes:
+      - minecraft-data:/srv
+    restart: unless-stopped
+    networks:
+      - mc-network
+
+networks:
+  mc-network:
+    driver: bridge
+
+volumes:
+  minecraft-data:
+  mc-admin-data:
