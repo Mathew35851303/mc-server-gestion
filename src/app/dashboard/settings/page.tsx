@@ -17,6 +17,7 @@ interface ServerProperty {
   type: "string" | "number" | "boolean";
   description: string;
   category: string;
+  options?: string[];
 }
 
 const categoryLabels: Record<string, string> = {
@@ -204,6 +205,19 @@ export default function SettingsPage() {
                         >
                           <SelectOption value="true">true</SelectOption>
                           <SelectOption value="false">false</SelectOption>
+                        </Select>
+                      ) : prop.options && prop.options.length > 0 ? (
+                        <Select
+                          id={prop.key}
+                          value={getValue(prop)}
+                          onChange={(e) => handleChange(prop.key, e.target.value)}
+                          className="max-w-xs"
+                        >
+                          {prop.options.map((option) => (
+                            <SelectOption key={option} value={option}>
+                              {option}
+                            </SelectOption>
+                          ))}
                         </Select>
                       ) : (
                         <Input

@@ -10,12 +10,13 @@ export interface ServerProperty {
   type: "string" | "number" | "boolean";
   description?: string;
   category: string;
+  options?: string[];
 }
 
 // Common server.properties with descriptions
 export const PROPERTY_DEFINITIONS: Record<
   string,
-  { type: "string" | "number" | "boolean"; description: string; category: string }
+  { type: "string" | "number" | "boolean"; description: string; category: string; options?: string[] }
 > = {
   "server-port": {
     type: "number",
@@ -44,13 +45,15 @@ export const PROPERTY_DEFINITIONS: Record<
   },
   gamemode: {
     type: "string",
-    description: "Mode de jeu par défaut (survival, creative, adventure, spectator)",
+    description: "Mode de jeu par défaut",
     category: "gameplay",
+    options: ["survival", "creative", "adventure", "spectator"],
   },
   difficulty: {
     type: "string",
-    description: "Difficulté (peaceful, easy, normal, hard)",
+    description: "Difficulté du jeu",
     category: "gameplay",
+    options: ["peaceful", "easy", "normal", "hard"],
   },
   hardcore: {
     type: "boolean",

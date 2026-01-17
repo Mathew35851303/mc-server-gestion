@@ -27,6 +27,7 @@ export async function GET() {
           type: definition?.type || "string",
           description: definition?.description || "",
           category: definition?.category || "other",
+          options: definition?.options,
         };
       }
     );
