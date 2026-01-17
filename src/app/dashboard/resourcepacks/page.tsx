@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
 import {
   Search,
   Plus,
@@ -15,6 +16,8 @@ import {
   Sparkles,
   Check,
   ExternalLink,
+  FileArchive,
+  Loader2,
 } from "lucide-react";
 import { useToast } from "@/components/ui/toaster";
 
@@ -45,6 +48,23 @@ interface GeneratedPack {
   url: string;
 }
 
+interface PackProgress {
+  packId: string;
+  packName: string;
+  status: "pending" | "downloading" | "extracting" | "complete" | "error";
+  progress: number;
+  downloaded?: number;
+  total?: number;
+  error?: string;
+}
+
+interface GenerationState {
+  active: boolean;
+  phase: string;
+  packs: PackProgress[];
+  message?: string;
+}
+
 export default function ResourcePacksPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
@@ -52,8 +72,12 @@ export default function ResourcePacksPage() {
   const [selectedPacks, setSelectedPacks] = useState<SelectedPack[]>([]);
   const [generatedPack, setGeneratedPack] = useState<GeneratedPack | null>(null);
   const [loading, setLoading] = useState(true);
-  const [generating, setGenerating] = useState(false);
   const [addingPack, setAddingPack] = useState<string | null>(null);
+  const [generation, setGeneration] = useState<GenerationState>({
+    active: false,
+    phase: "",
+    packs: [],
+  });
   const toast = useToast();
 
   // Fetch current selected packs
@@ -101,14 +125,12 @@ export default function ResourcePacksPage() {
   const handleAddPack = async (pack: SearchResult) => {
     setAddingPack(pack.id);
     try {
-      // First get full details including download URL
       const detailsRes = await fetch(`/api/resourcepacks/${pack.id}`);
       if (!detailsRes.ok) {
         throw new Error("Failed to get pack details");
       }
       const details = await detailsRes.json();
 
-      // Add to list
       const response = await fetch("/api/resourcepacks", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -158,27 +180,147 @@ export default function ResourcePacksPage() {
     }
   };
 
-  // Generate merged pack
+  // Generate with progress streaming
   const handleGenerate = async () => {
-    setGenerating(true);
+    // Initialize progress state
+    setGeneration({
+      active: true,
+      phase: "Démarrage...",
+      packs: selectedPacks.map((p) => ({
+        packId: p.id,
+        packName: p.name,
+        status: "pending",
+        progress: 0,
+      })),
+    });
+
     try {
-      const response = await fetch("/api/resourcepacks/generate", {
-        method: "POST",
-      });
+      const eventSource = new EventSource("/api/resourcepacks/generate/stream");
 
-      const data = await response.json();
+      eventSource.onmessage = (event) => {
+        const data = JSON.parse(event.data);
 
-      if (response.ok) {
-        toast.success(data.message);
-        setGeneratedPack(data.pack);
-      } else {
-        toast.error(data.error || "Erreur lors de la génération");
-      }
+        switch (data.type) {
+          case "start":
+            setGeneration((prev) => ({
+              ...prev,
+              phase: "Préparation...",
+            }));
+            break;
+
+          case "downloading":
+            setGeneration((prev) => ({
+              ...prev,
+              phase: `Téléchargement de ${data.packName}...`,
+              packs: prev.packs.map((p) =>
+                p.packId === data.packId
+                  ? {
+                      ...p,
+                      status: "downloading",
+                      progress: data.progress || 0,
+                      downloaded: data.downloaded,
+                      total: data.total,
+                    }
+                  : p
+              ),
+            }));
+            break;
+
+          case "extracting":
+            setGeneration((prev) => ({
+              ...prev,
+              phase: `Extraction de ${data.packName}...`,
+              packs: prev.packs.map((p) =>
+                p.packId === data.packId
+                  ? { ...p, status: "extracting", progress: 100 }
+                  : p
+              ),
+            }));
+            break;
+
+          case "packComplete":
+            setGeneration((prev) => ({
+              ...prev,
+              packs: prev.packs.map((p) =>
+                p.packId === data.packId
+                  ? { ...p, status: "complete", progress: 100 }
+                  : p
+              ),
+            }));
+            break;
+
+          case "packError":
+            setGeneration((prev) => ({
+              ...prev,
+              packs: prev.packs.map((p) =>
+                p.packId === data.packId
+                  ? { ...p, status: "error", error: data.error }
+                  : p
+              ),
+            }));
+            break;
+
+          case "merging":
+            setGeneration((prev) => ({
+              ...prev,
+              phase: "Fusion des packs...",
+            }));
+            break;
+
+          case "compressing":
+            setGeneration((prev) => ({
+              ...prev,
+              phase: "Compression...",
+            }));
+            break;
+
+          case "processing":
+            setGeneration((prev) => ({
+              ...prev,
+              phase: data.message,
+            }));
+            break;
+
+          case "complete":
+            setGeneration({
+              active: false,
+              phase: "",
+              packs: [],
+            });
+            setGeneratedPack(data.pack);
+            toast.success(data.message);
+            eventSource.close();
+            break;
+
+          case "error":
+            setGeneration({
+              active: false,
+              phase: "",
+              packs: [],
+            });
+            toast.error(data.message);
+            eventSource.close();
+            break;
+        }
+      };
+
+      eventSource.onerror = () => {
+        setGeneration({
+          active: false,
+          phase: "",
+          packs: [],
+        });
+        toast.error("Connexion perdue pendant la génération");
+        eventSource.close();
+      };
     } catch (error) {
+      setGeneration({
+        active: false,
+        phase: "",
+        packs: [],
+      });
       toast.error("Erreur lors de la génération");
       console.error("Generate error:", error);
-    } finally {
-      setGenerating(false);
     }
   };
 
@@ -197,6 +339,36 @@ export default function ResourcePacksPage() {
   const isPackSelected = (packId: string) =>
     selectedPacks.some((p) => p.id === packId);
 
+  const getStatusIcon = (status: PackProgress["status"]) => {
+    switch (status) {
+      case "pending":
+        return <Package className="h-4 w-4 text-muted-foreground" />;
+      case "downloading":
+        return <Download className="h-4 w-4 text-blue-500 animate-pulse" />;
+      case "extracting":
+        return <FileArchive className="h-4 w-4 text-yellow-500 animate-pulse" />;
+      case "complete":
+        return <Check className="h-4 w-4 text-green-500" />;
+      case "error":
+        return <Trash2 className="h-4 w-4 text-red-500" />;
+    }
+  };
+
+  const getStatusColor = (status: PackProgress["status"]) => {
+    switch (status) {
+      case "pending":
+        return "bg-muted";
+      case "downloading":
+        return "bg-blue-500";
+      case "extracting":
+        return "bg-yellow-500";
+      case "complete":
+        return "bg-green-500";
+      case "error":
+        return "bg-red-500";
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -211,11 +383,58 @@ export default function ResourcePacksPage() {
           variant="outline"
           size="icon"
           onClick={fetchSelectedPacks}
-          disabled={loading}
+          disabled={loading || generation.active}
         >
           <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
         </Button>
       </div>
+
+      {/* Generation Progress */}
+      {generation.active && (
+        <Card className="border-primary">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-primary">
+              <Loader2 className="h-5 w-5 animate-spin" />
+              Génération en cours
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="text-sm font-medium">{generation.phase}</div>
+
+            <div className="space-y-3">
+              {generation.packs.map((pack) => (
+                <div key={pack.packId} className="space-y-1">
+                  <div className="flex items-center justify-between text-sm">
+                    <div className="flex items-center gap-2">
+                      {getStatusIcon(pack.status)}
+                      <span className={pack.status === "complete" ? "text-muted-foreground" : ""}>
+                        {pack.packName}
+                      </span>
+                    </div>
+                    <span className="text-muted-foreground text-xs">
+                      {pack.status === "downloading" && pack.downloaded && pack.total
+                        ? `${formatBytes(pack.downloaded)} / ${formatBytes(pack.total)}`
+                        : pack.status === "downloading"
+                          ? `${pack.progress}%`
+                          : pack.status === "extracting"
+                            ? "Extraction..."
+                            : pack.status === "complete"
+                              ? "Terminé"
+                              : pack.status === "error"
+                                ? "Erreur"
+                                : "En attente"}
+                    </span>
+                  </div>
+                  <Progress
+                    value={pack.progress}
+                    className={`h-2 ${getStatusColor(pack.status)}`}
+                  />
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Search Section */}
       <Card>
@@ -232,8 +451,9 @@ export default function ResourcePacksPage() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+              disabled={generation.active}
             />
-            <Button onClick={handleSearch} disabled={searching} className="gap-2">
+            <Button onClick={handleSearch} disabled={searching || generation.active} className="gap-2">
               {searching ? (
                 <RefreshCw className="h-4 w-4 animate-spin" />
               ) : (
@@ -278,7 +498,7 @@ export default function ResourcePacksPage() {
                     size="sm"
                     variant={isPackSelected(pack.id) ? "secondary" : "default"}
                     onClick={() => handleAddPack(pack)}
-                    disabled={isPackSelected(pack.id) || addingPack === pack.id}
+                    disabled={isPackSelected(pack.id) || addingPack === pack.id || generation.active}
                     className="gap-1"
                   >
                     {addingPack === pack.id ? (
@@ -348,6 +568,7 @@ export default function ResourcePacksPage() {
                     size="icon"
                     variant="ghost"
                     onClick={() => handleRemovePack(pack.id)}
+                    disabled={generation.active}
                     className="text-destructive hover:text-destructive"
                   >
                     <Trash2 className="h-4 w-4" />
@@ -358,24 +579,17 @@ export default function ResourcePacksPage() {
           )}
 
           {/* Generate Button */}
-          {selectedPacks.length > 0 && (
+          {selectedPacks.length > 0 && !generation.active && (
             <div className="mt-4 pt-4 border-t">
               <Button
                 onClick={handleGenerate}
-                disabled={generating}
                 className="w-full gap-2"
                 size="lg"
               >
-                {generating ? (
-                  <RefreshCw className="h-5 w-5 animate-spin" />
-                ) : (
-                  <Sparkles className="h-5 w-5" />
-                )}
-                {generating
-                  ? "Génération en cours..."
-                  : selectedPacks.length === 1
-                    ? "Appliquer le resource pack"
-                    : `Fusionner et appliquer (${selectedPacks.length} packs)`}
+                <Sparkles className="h-5 w-5" />
+                {selectedPacks.length === 1
+                  ? "Appliquer le resource pack"
+                  : `Fusionner et appliquer (${selectedPacks.length} packs)`}
               </Button>
               <p className="text-xs text-muted-foreground text-center mt-2">
                 {selectedPacks.length > 1
@@ -388,7 +602,7 @@ export default function ResourcePacksPage() {
       </Card>
 
       {/* Generated Pack Info */}
-      {generatedPack && (
+      {generatedPack && !generation.active && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-green-600 dark:text-green-400">
