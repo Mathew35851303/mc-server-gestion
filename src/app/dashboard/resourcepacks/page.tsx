@@ -20,6 +20,7 @@ import {
   Loader2,
   Filter,
   X,
+  Upload,
 } from "lucide-react";
 import { useToast } from "@/components/ui/toaster";
 
@@ -81,6 +82,7 @@ export default function ResourcePacksPage() {
     packs: [],
   });
   const [selectedFilter, setSelectedFilter] = useState("");
+  const [uploading, setUploading] = useState(false);
   const toast = useToast();
 
   // Filter selected packs
@@ -347,6 +349,43 @@ export default function ResourcePacksPage() {
   const isPackSelected = (packId: string) =>
     selectedPacks.some((p) => p.id === packId);
 
+  // Handle file upload
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.name.endsWith(".zip")) {
+      toast.error("Seuls les fichiers .zip sont acceptés");
+      return;
+    }
+
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const response = await fetch("/api/resourcepacks/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        toast.success(`${file.name} importé avec succès`);
+        await fetchSelectedPacks();
+      } else {
+        toast.error(data.error || "Erreur lors de l'import");
+      }
+    } catch (error) {
+      toast.error("Erreur lors de l'import");
+      console.error("Upload error:", error);
+    } finally {
+      setUploading(false);
+      e.target.value = "";
+    }
+  };
+
   const getStatusIcon = (status: PackProgress["status"]) => {
     switch (status) {
       case "pending":
@@ -387,14 +426,38 @@ export default function ResourcePacksPage() {
             Recherchez et combinez des resource packs pour votre serveur
           </p>
         </div>
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={fetchSelectedPacks}
-          disabled={loading || generation.active}
-        >
-          <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            disabled={uploading || generation.active}
+            className="gap-2"
+            asChild
+          >
+            <label className="cursor-pointer">
+              {uploading ? (
+                <RefreshCw className="h-4 w-4 animate-spin" />
+              ) : (
+                <Upload className="h-4 w-4" />
+              )}
+              Importer
+              <input
+                type="file"
+                accept=".zip"
+                onChange={handleFileUpload}
+                className="hidden"
+                disabled={uploading || generation.active}
+              />
+            </label>
+          </Button>
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={fetchSelectedPacks}
+            disabled={loading || generation.active}
+          >
+            <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+          </Button>
+        </div>
       </div>
 
       {/* Generation Progress */}

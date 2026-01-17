@@ -22,6 +22,7 @@ import {
   Copy,
   ExternalLink,
   FileJson,
+  Upload,
 } from "lucide-react";
 import { useToast } from "@/components/ui/toaster";
 
@@ -90,6 +91,7 @@ export default function ShadersPage() {
   const [installedFilter, setInstalledFilter] = useState("");
   const [manifest, setManifest] = useState<ShaderManifest | null>(null);
   const [manifestLoading, setManifestLoading] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const toast = useToast();
 
   // Filter installed shaders
@@ -340,6 +342,44 @@ export default function ShadersPage() {
 
   const isShaderInList = (shaderId: string) => shadersToInstall.some((s) => s.id === shaderId);
 
+  // Handle file upload
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.name.endsWith(".zip")) {
+      toast.error("Seuls les fichiers .zip sont acceptés");
+      return;
+    }
+
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const response = await fetch("/api/shaders/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        toast.success(`${file.name} importé avec succès`);
+        await fetchInstalledShaders();
+        await fetchManifest();
+      } else {
+        toast.error(data.error || "Erreur lors de l'import");
+      }
+    } catch (error) {
+      toast.error("Erreur lors de l'import");
+      console.error("Upload error:", error);
+    } finally {
+      setUploading(false);
+      e.target.value = "";
+    }
+  };
+
   const copyManifestUrl = () => {
     const url = `${window.location.origin}/api/manifest/shaders`;
     navigator.clipboard.writeText(url);
@@ -384,14 +424,38 @@ export default function ShadersPage() {
             Recherchez et installez des shaders depuis Modrinth
           </p>
         </div>
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={fetchInstalledShaders}
-          disabled={loading || installation.active}
-        >
-          <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            disabled={uploading || installation.active}
+            className="gap-2"
+            asChild
+          >
+            <label className="cursor-pointer">
+              {uploading ? (
+                <RefreshCw className="h-4 w-4 animate-spin" />
+              ) : (
+                <Upload className="h-4 w-4" />
+              )}
+              Importer
+              <input
+                type="file"
+                accept=".zip"
+                onChange={handleFileUpload}
+                className="hidden"
+                disabled={uploading || installation.active}
+              />
+            </label>
+          </Button>
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={fetchInstalledShaders}
+            disabled={loading || installation.active}
+          >
+            <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+          </Button>
+        </div>
       </div>
 
       {/* Installation Progress */}
