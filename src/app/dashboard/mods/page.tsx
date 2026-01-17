@@ -115,15 +115,15 @@ export default function ModsPage() {
   // Get base URL for manifest
   const getManifestUrl = () => {
     if (typeof window !== "undefined") {
-      return `${window.location.origin}/api/manifest`;
+      return `${window.location.origin}/api/manifest/mods`;
     }
-    return "/api/manifest";
+    return "/api/manifest/mods";
   };
 
   // Fetch manifest info
   const fetchManifest = useCallback(async () => {
     try {
-      const response = await fetch("/api/manifest");
+      const response = await fetch("/api/manifest/mods");
       if (response.ok) {
         const data = await response.json();
         setManifest(data);
@@ -757,7 +757,7 @@ export default function ModsPage() {
                 asChild
                 title="Ouvrir le manifest"
               >
-                <a href="/api/manifest" target="_blank" rel="noopener noreferrer">
+                <a href="/api/manifest/mods" target="_blank" rel="noopener noreferrer">
                   <ExternalLink className="h-4 w-4" />
                 </a>
               </Button>

@@ -26,7 +26,7 @@ export async function GET() {
     if (!existsSync(MODS_DIR)) {
       return NextResponse.json({
         version: "1.0.0",
-        minecraft_version: "1.20.1",
+        minecraft_version: process.env.MC_VERSION || "1.20.1",
         last_updated: new Date().toISOString(),
         mods: [],
       });
