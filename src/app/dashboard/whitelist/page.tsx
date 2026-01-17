@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { WhitelistTable } from "@/components/whitelist-table";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
 import { RefreshCw, Shield, ShieldOff } from "lucide-react";
 import { useToast } from "@/components/ui/toaster";
 
@@ -107,26 +108,34 @@ export default function WhitelistPage() {
             Gérez les joueurs autorisés à rejoindre le serveur
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-4">
           {/* Whitelist toggle */}
-          <Button
-            variant={enabled ? "default" : "outline"}
-            onClick={handleToggle}
-            disabled={toggling || loading}
-            className="gap-2"
-          >
-            {enabled ? (
-              <>
-                <Shield className="h-4 w-4" />
-                Whitelist activée
-              </>
-            ) : (
-              <>
-                <ShieldOff className="h-4 w-4" />
-                Whitelist désactivée
-              </>
-            )}
-          </Button>
+          <div className="flex items-center gap-3">
+            <Switch
+              checked={enabled}
+              onCheckedChange={handleToggle}
+              disabled={toggling || loading}
+              id="whitelist-toggle"
+            />
+            <label
+              htmlFor="whitelist-toggle"
+              className={`text-sm font-medium flex items-center gap-2 ${
+                enabled ? "text-green-600 dark:text-green-400" : "text-muted-foreground"
+              }`}
+            >
+              {enabled ? (
+                <>
+                  <Shield className="h-4 w-4" />
+                  Activée
+                </>
+              ) : (
+                <>
+                  <ShieldOff className="h-4 w-4" />
+                  Désactivée
+                </>
+              )}
+            </label>
+          </div>
           <Button variant="outline" size="icon" onClick={fetchWhitelist}>
             <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
           </Button>

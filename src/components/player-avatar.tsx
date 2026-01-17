@@ -18,10 +18,12 @@ export function PlayerAvatar({
 }: PlayerAvatarProps) {
   const [error, setError] = useState(false);
 
-  // Use Crafatar API for player heads
-  // If we have UUID, use it directly. Otherwise, we can't show the avatar.
-  const avatarUrl = uuid
-    ? `https://crafatar.com/avatars/${uuid}?size=${size}&overlay`
+  // Use mc-heads.net API - works with username directly, no CORS issues
+  // Priority: username > uuid (mc-heads works better with usernames)
+  const avatarUrl = username
+    ? `https://mc-heads.net/avatar/${username}/${size}`
+    : uuid
+    ? `https://mc-heads.net/avatar/${uuid}/${size}`
     : null;
 
   if (!avatarUrl || error) {
