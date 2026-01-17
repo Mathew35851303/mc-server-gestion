@@ -17,6 +17,8 @@ import {
   FolderOpen,
   AlertTriangle,
   Sparkles,
+  Filter,
+  X,
 } from "lucide-react";
 import { useToast } from "@/components/ui/toaster";
 
@@ -70,7 +72,13 @@ export default function ShadersPage() {
     active: false,
     shaders: [],
   });
+  const [installedFilter, setInstalledFilter] = useState("");
   const toast = useToast();
+
+  // Filter installed shaders
+  const filteredInstalledShaders = installedShaders.filter((shader) =>
+    shader.filename.toLowerCase().includes(installedFilter.toLowerCase())
+  );
 
   // Fetch installed shaders
   const fetchInstalledShaders = useCallback(async () => {
@@ -527,32 +535,69 @@ export default function ShadersPage() {
               Aucun shader installé dans le dossier shaderpacks
             </p>
           ) : (
-            <div className="space-y-2 max-h-96 overflow-y-auto">
-              {installedShaders.map((shader) => (
-                <div
-                  key={shader.filename}
-                  className="flex items-center gap-3 p-3 rounded-lg border"
-                >
-                  <div className="w-10 h-10 rounded bg-muted flex items-center justify-center">
-                    <Sparkles className="h-5 w-5 text-muted-foreground" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <span className="font-mono text-sm truncate block">{shader.filename}</span>
-                    <span className="text-xs text-muted-foreground">
-                      {formatBytes(shader.size)}
-                    </span>
-                  </div>
+            <div className="space-y-3">
+              {/* Search/Filter bar */}
+              <div className="relative">
+                <Filter className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Filtrer les shaders installés..."
+                  value={installedFilter}
+                  onChange={(e) => setInstalledFilter(e.target.value)}
+                  className="pl-9 pr-9"
+                />
+                {installedFilter && (
                   <Button
-                    size="icon"
                     variant="ghost"
-                    onClick={() => handleDeleteShader(shader.filename)}
-                    disabled={installation.active}
-                    className="text-destructive hover:text-destructive"
+                    size="icon"
+                    className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7"
+                    onClick={() => setInstalledFilter("")}
                   >
-                    <Trash2 className="h-4 w-4" />
+                    <X className="h-4 w-4" />
                   </Button>
-                </div>
-              ))}
+                )}
+              </div>
+
+              {/* Results count when filtering */}
+              {installedFilter && (
+                <p className="text-xs text-muted-foreground">
+                  {filteredInstalledShaders.length} résultat(s) sur {installedShaders.length}
+                </p>
+              )}
+
+              {/* Shaders list */}
+              <div className="space-y-2 max-h-96 overflow-y-auto">
+                {filteredInstalledShaders.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-4">
+                    Aucun shader ne correspond à &quot;{installedFilter}&quot;
+                  </p>
+                ) : (
+                  filteredInstalledShaders.map((shader) => (
+                    <div
+                      key={shader.filename}
+                      className="flex items-center gap-3 p-3 rounded-lg border"
+                    >
+                      <div className="w-10 h-10 rounded bg-muted flex items-center justify-center">
+                        <Sparkles className="h-5 w-5 text-muted-foreground" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <span className="font-mono text-sm truncate block">{shader.filename}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {formatBytes(shader.size)}
+                        </span>
+                      </div>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => handleDeleteShader(shader.filename)}
+                        disabled={installation.active}
+                        className="text-destructive hover:text-destructive"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))
+                )}
+              </div>
             </div>
           )}
 

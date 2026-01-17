@@ -18,6 +18,11 @@ import {
   FolderOpen,
   AlertTriangle,
   Link2,
+  Filter,
+  X,
+  Copy,
+  ExternalLink,
+  FileJson,
 } from "lucide-react";
 import { useToast } from "@/components/ui/toaster";
 
@@ -79,6 +84,18 @@ interface InstallationState {
   mods: ModProgress[];
 }
 
+interface ManifestInfo {
+  version: string;
+  minecraft_version: string;
+  last_updated: string;
+  mods: {
+    filename: string;
+    size: number;
+    sha256: string;
+    url: string;
+  }[];
+}
+
 export default function ModsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
@@ -91,7 +108,45 @@ export default function ModsPage() {
     active: false,
     mods: [],
   });
+  const [installedFilter, setInstalledFilter] = useState("");
+  const [manifest, setManifest] = useState<ManifestInfo | null>(null);
   const toast = useToast();
+
+  // Get base URL for manifest
+  const getManifestUrl = () => {
+    if (typeof window !== "undefined") {
+      return `${window.location.origin}/api/manifest`;
+    }
+    return "/api/manifest";
+  };
+
+  // Fetch manifest info
+  const fetchManifest = useCallback(async () => {
+    try {
+      const response = await fetch("/api/manifest");
+      if (response.ok) {
+        const data = await response.json();
+        setManifest(data);
+      }
+    } catch (error) {
+      console.error("Failed to fetch manifest:", error);
+    }
+  }, []);
+
+  // Copy to clipboard
+  const copyToClipboard = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success("Copié dans le presse-papier");
+    } catch {
+      toast.error("Erreur lors de la copie");
+    }
+  };
+
+  // Filter installed mods
+  const filteredInstalledMods = installedMods.filter((mod) =>
+    mod.filename.toLowerCase().includes(installedFilter.toLowerCase())
+  );
 
   // Fetch installed mods
   const fetchInstalledMods = useCallback(async () => {
@@ -110,7 +165,8 @@ export default function ModsPage() {
 
   useEffect(() => {
     fetchInstalledMods();
-  }, [fetchInstalledMods]);
+    fetchManifest();
+  }, [fetchInstalledMods, fetchManifest]);
 
   // Search for mods
   const handleSearch = async () => {
@@ -591,32 +647,69 @@ export default function ModsPage() {
               Aucun mod installé dans le dossier mods
             </p>
           ) : (
-            <div className="space-y-2 max-h-96 overflow-y-auto">
-              {installedMods.map((mod) => (
-                <div
-                  key={mod.filename}
-                  className="flex items-center gap-3 p-3 rounded-lg border"
-                >
-                  <div className="w-10 h-10 rounded bg-muted flex items-center justify-center">
-                    <Box className="h-5 w-5 text-muted-foreground" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <span className="font-mono text-sm truncate block">{mod.filename}</span>
-                    <span className="text-xs text-muted-foreground">
-                      {formatBytes(mod.size)}
-                    </span>
-                  </div>
+            <div className="space-y-3">
+              {/* Search/Filter bar */}
+              <div className="relative">
+                <Filter className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Filtrer les mods installés..."
+                  value={installedFilter}
+                  onChange={(e) => setInstalledFilter(e.target.value)}
+                  className="pl-9 pr-9"
+                />
+                {installedFilter && (
                   <Button
-                    size="icon"
                     variant="ghost"
-                    onClick={() => handleDeleteMod(mod.filename)}
-                    disabled={installation.active}
-                    className="text-destructive hover:text-destructive"
+                    size="icon"
+                    className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7"
+                    onClick={() => setInstalledFilter("")}
                   >
-                    <Trash2 className="h-4 w-4" />
+                    <X className="h-4 w-4" />
                   </Button>
-                </div>
-              ))}
+                )}
+              </div>
+
+              {/* Results count when filtering */}
+              {installedFilter && (
+                <p className="text-xs text-muted-foreground">
+                  {filteredInstalledMods.length} résultat(s) sur {installedMods.length}
+                </p>
+              )}
+
+              {/* Mods list */}
+              <div className="space-y-2 max-h-96 overflow-y-auto">
+                {filteredInstalledMods.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-4">
+                    Aucun mod ne correspond à &quot;{installedFilter}&quot;
+                  </p>
+                ) : (
+                  filteredInstalledMods.map((mod) => (
+                    <div
+                      key={mod.filename}
+                      className="flex items-center gap-3 p-3 rounded-lg border"
+                    >
+                      <div className="w-10 h-10 rounded bg-muted flex items-center justify-center">
+                        <Box className="h-5 w-5 text-muted-foreground" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <span className="font-mono text-sm truncate block">{mod.filename}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {formatBytes(mod.size)}
+                        </span>
+                      </div>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => handleDeleteMod(mod.filename)}
+                        disabled={installation.active}
+                        className="text-destructive hover:text-destructive"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))
+                )}
+              </div>
             </div>
           )}
 
@@ -625,6 +718,96 @@ export default function ModsPage() {
               Redémarrez le serveur pour charger les modifications
             </p>
           )}
+        </CardContent>
+      </Card>
+
+      {/* Launcher Manifest */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <FileJson className="h-5 w-5" />
+            Manifest Launcher
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            Utilisez cette URL dans votre launcher pour synchroniser automatiquement les mods avec les joueurs.
+          </p>
+
+          {/* Manifest URL */}
+          <div className="space-y-2">
+            <label className="text-sm font-medium">URL du Manifest</label>
+            <div className="flex gap-2">
+              <Input
+                value={getManifestUrl()}
+                readOnly
+                className="font-mono text-sm"
+              />
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => copyToClipboard(getManifestUrl())}
+                title="Copier l'URL"
+              >
+                <Copy className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                asChild
+                title="Ouvrir le manifest"
+              >
+                <a href="/api/manifest" target="_blank" rel="noopener noreferrer">
+                  <ExternalLink className="h-4 w-4" />
+                </a>
+              </Button>
+            </div>
+          </div>
+
+          {/* Manifest Stats */}
+          {manifest && (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-4 border-t">
+              <div className="text-center">
+                <div className="text-2xl font-bold">{manifest.mods.length}</div>
+                <div className="text-xs text-muted-foreground">Mods</div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold">
+                  {formatBytes(manifest.mods.reduce((acc, m) => acc + m.size, 0))}
+                </div>
+                <div className="text-xs text-muted-foreground">Taille totale</div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold">{manifest.minecraft_version}</div>
+                <div className="text-xs text-muted-foreground">Version MC</div>
+              </div>
+              <div className="text-center">
+                <div className="text-lg font-medium">
+                  {new Date(manifest.last_updated).toLocaleDateString()}
+                </div>
+                <div className="text-xs text-muted-foreground">Dernière MAJ</div>
+              </div>
+            </div>
+          )}
+
+          <div className="pt-4 border-t">
+            <Button
+              variant="outline"
+              onClick={() => {
+                fetchManifest();
+                toast.success("Manifest actualisé");
+              }}
+              className="gap-2"
+            >
+              <RefreshCw className="h-4 w-4" />
+              Actualiser le manifest
+            </Button>
+          </div>
+
+          <p className="text-xs text-muted-foreground">
+            Le manifest est généré automatiquement à partir des mods installés.
+            Les joueurs peuvent utiliser l&apos;URL ci-dessus dans leur launcher pour télécharger les mods.
+          </p>
         </CardContent>
       </Card>
     </div>

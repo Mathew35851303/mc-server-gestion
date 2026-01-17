@@ -18,6 +18,8 @@ import {
   ExternalLink,
   FileArchive,
   Loader2,
+  Filter,
+  X,
 } from "lucide-react";
 import { useToast } from "@/components/ui/toaster";
 
@@ -78,7 +80,13 @@ export default function ResourcePacksPage() {
     phase: "",
     packs: [],
   });
+  const [selectedFilter, setSelectedFilter] = useState("");
   const toast = useToast();
+
+  // Filter selected packs
+  const filteredSelectedPacks = selectedPacks.filter((pack) =>
+    pack.name.toLowerCase().includes(selectedFilter.toLowerCase())
+  );
 
   // Fetch current selected packs
   const fetchSelectedPacks = useCallback(async () => {
@@ -536,45 +544,89 @@ export default function ResourcePacksPage() {
               Aucun resource pack sélectionné. Utilisez la recherche pour en ajouter.
             </p>
           ) : (
-            <div className="space-y-2">
-              {selectedPacks.map((pack, index) => (
-                <div
-                  key={pack.id}
-                  className="flex items-center gap-3 p-3 rounded-lg border"
-                >
-                  <span className="text-muted-foreground text-sm font-mono w-6">
-                    {index + 1}.
-                  </span>
-                  {pack.icon ? (
-                    <img
-                      src={pack.icon}
-                      alt={pack.name}
-                      className="w-10 h-10 rounded"
+            <div className="space-y-3">
+              {/* Search/Filter bar */}
+              {selectedPacks.length > 3 && (
+                <>
+                  <div className="relative">
+                    <Filter className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Filtrer les packs sélectionnés..."
+                      value={selectedFilter}
+                      onChange={(e) => setSelectedFilter(e.target.value)}
+                      className="pl-9 pr-9"
                     />
-                  ) : (
-                    <div className="w-10 h-10 rounded bg-muted flex items-center justify-center">
-                      <Package className="h-5 w-5 text-muted-foreground" />
-                    </div>
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <span className="font-medium">{pack.name}</span>
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                      <span>v{pack.version}</span>
-                      <span>•</span>
-                      <span>{formatBytes(pack.size)}</span>
-                    </div>
+                    {selectedFilter && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7"
+                        onClick={() => setSelectedFilter("")}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    )}
                   </div>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    onClick={() => handleRemovePack(pack.id)}
-                    disabled={generation.active}
-                    className="text-destructive hover:text-destructive"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              ))}
+
+                  {/* Results count when filtering */}
+                  {selectedFilter && (
+                    <p className="text-xs text-muted-foreground">
+                      {filteredSelectedPacks.length} résultat(s) sur {selectedPacks.length}
+                    </p>
+                  )}
+                </>
+              )}
+
+              {/* Packs list */}
+              <div className="space-y-2">
+                {filteredSelectedPacks.length === 0 && selectedFilter ? (
+                  <p className="text-sm text-muted-foreground text-center py-4">
+                    Aucun pack ne correspond à &quot;{selectedFilter}&quot;
+                  </p>
+                ) : (
+                  filteredSelectedPacks.map((pack) => {
+                    const originalIndex = selectedPacks.findIndex((p) => p.id === pack.id);
+                    return (
+                      <div
+                        key={pack.id}
+                        className="flex items-center gap-3 p-3 rounded-lg border"
+                      >
+                        <span className="text-muted-foreground text-sm font-mono w-6">
+                          {originalIndex + 1}.
+                        </span>
+                        {pack.icon ? (
+                          <img
+                            src={pack.icon}
+                            alt={pack.name}
+                            className="w-10 h-10 rounded"
+                          />
+                        ) : (
+                          <div className="w-10 h-10 rounded bg-muted flex items-center justify-center">
+                            <Package className="h-5 w-5 text-muted-foreground" />
+                          </div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <span className="font-medium">{pack.name}</span>
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                            <span>v{pack.version}</span>
+                            <span>•</span>
+                            <span>{formatBytes(pack.size)}</span>
+                          </div>
+                        </div>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => handleRemovePack(pack.id)}
+                          disabled={generation.active}
+                          className="text-destructive hover:text-destructive"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
             </div>
           )}
 
