@@ -104,6 +104,9 @@ export async function restartContainer(): Promise<void> {
 export async function getContainerLogs(tail: number = 100): Promise<string> {
   try {
     const container = await getContainer();
+    const info = await container.inspect();
+    const isTty = info.Config.Tty;
+
     const logs = await container.logs({
       stdout: true,
       stderr: true,
@@ -113,6 +116,10 @@ export async function getContainerLogs(tail: number = 100): Promise<string> {
 
     // Handle buffer or string response
     if (Buffer.isBuffer(logs)) {
+      // If TTY is enabled, logs are not multiplexed
+      if (isTty) {
+        return logs.toString("utf-8");
+      }
       return demuxDockerLogs(logs);
     }
     return String(logs);

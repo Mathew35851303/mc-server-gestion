@@ -15,6 +15,8 @@ export async function GET() {
 
   try {
     const container = await getContainer();
+    const info = await container.inspect();
+    const isTty = info.Config.Tty;
 
     logStream = (await container.logs({
       stdout: true,
@@ -32,26 +34,43 @@ export async function GET() {
           controller.enqueue(encoder.encode(`data: ${JSON.stringify({ log: data })}\n\n`));
         };
 
-        // Handle Docker multiplexed stream
-        let buffer = Buffer.alloc(0);
+        if (isTty) {
+          // TTY mode: logs are plain text, not multiplexed
+          let lineBuffer = "";
 
-        const processBuffer = () => {
-          while (buffer.length >= 8) {
-            const size = buffer.readUInt32BE(4);
-            if (buffer.length < 8 + size) break;
+          logStream!.on("data", (chunk: Buffer) => {
+            lineBuffer += chunk.toString("utf-8");
+            const lines = lineBuffer.split("\n");
+            lineBuffer = lines.pop() || "";
 
-            const line = buffer.slice(8, 8 + size).toString("utf-8").trimEnd();
-            if (line) {
-              sendData(line);
+            for (const line of lines) {
+              if (line.trim()) {
+                sendData(line);
+              }
             }
-            buffer = buffer.slice(8 + size);
-          }
-        };
+          });
+        } else {
+          // Non-TTY mode: Docker multiplexed stream
+          let buffer = Buffer.alloc(0);
 
-        logStream!.on("data", (chunk: Buffer) => {
-          buffer = Buffer.concat([buffer, chunk]);
-          processBuffer();
-        });
+          const processBuffer = () => {
+            while (buffer.length >= 8) {
+              const size = buffer.readUInt32BE(4);
+              if (buffer.length < 8 + size) break;
+
+              const line = buffer.slice(8, 8 + size).toString("utf-8").trimEnd();
+              if (line) {
+                sendData(line);
+              }
+              buffer = buffer.slice(8 + size);
+            }
+          };
+
+          logStream!.on("data", (chunk: Buffer) => {
+            buffer = Buffer.concat([buffer, chunk]);
+            processBuffer();
+          });
+        }
 
         logStream!.on("end", () => {
           controller.close();

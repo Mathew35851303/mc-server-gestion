@@ -2,8 +2,7 @@ services:
   mc-admin:
     build: .
     container_name: mc-admin
-    group_add:
-      - "999"
+    user: root
     ports:
       - "3002:3000"
     networks:
