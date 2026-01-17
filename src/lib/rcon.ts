@@ -86,6 +86,14 @@ class MinecraftRcon {
     return this.send("whitelist reload");
   }
 
+  async whitelistOn(): Promise<string> {
+    return this.send("whitelist on");
+  }
+
+  async whitelistOff(): Promise<string> {
+    return this.send("whitelist off");
+  }
+
   // Player commands
   async listPlayers(): Promise<{ online: number; max: number; players: string[] }> {
     const response = await this.send("list");

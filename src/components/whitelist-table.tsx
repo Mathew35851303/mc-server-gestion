@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -12,7 +12,8 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Trash2, UserPlus, Search } from "lucide-react";
+import { Trash2, UserPlus, Search, Check, X } from "lucide-react";
+import { PlayerAvatar } from "@/components/player-avatar";
 
 interface Player {
   uuid: string;
@@ -26,6 +27,50 @@ interface WhitelistTableProps {
   loading?: boolean;
 }
 
+// Hook to lookup player UUID from Mojang API
+function usePlayerLookup(username: string) {
+  const [data, setData] = useState<{ uuid: string; name: string } | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(false);
+
+  useEffect(() => {
+    if (!username || username.length < 3) {
+      setData(null);
+      setError(false);
+      return;
+    }
+
+    const timeout = setTimeout(() => {
+      setLoading(true);
+      setError(false);
+
+      fetch(`https://api.mojang.com/users/profiles/minecraft/${username}`)
+        .then((res) => {
+          if (!res.ok) throw new Error("Player not found");
+          return res.json();
+        })
+        .then((result) => {
+          const uuid = formatUuid(result.id);
+          setData({ uuid, name: result.name });
+        })
+        .catch(() => {
+          setData(null);
+          setError(true);
+        })
+        .finally(() => setLoading(false));
+    }, 500); // Debounce
+
+    return () => clearTimeout(timeout);
+  }, [username]);
+
+  return { data, loading, error };
+}
+
+function formatUuid(uuid: string): string {
+  if (uuid.includes("-")) return uuid;
+  return `${uuid.slice(0, 8)}-${uuid.slice(8, 12)}-${uuid.slice(12, 16)}-${uuid.slice(16, 20)}-${uuid.slice(20)}`;
+}
+
 export function WhitelistTable({
   players,
   onAdd,
@@ -36,18 +81,21 @@ export function WhitelistTable({
   const [newPlayer, setNewPlayer] = useState("");
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [removeDialogOpen, setRemoveDialogOpen] = useState(false);
-  const [playerToRemove, setPlayerToRemove] = useState<string | null>(null);
+  const [playerToRemove, setPlayerToRemove] = useState<Player | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
+
+  const playerLookup = usePlayerLookup(newPlayer);
 
   const filteredPlayers = players.filter((p) =>
     p.name.toLowerCase().includes(search.toLowerCase())
   );
 
   const handleAdd = async () => {
-    if (!newPlayer.trim()) return;
+    const nameToAdd = playerLookup.data?.name || newPlayer.trim();
+    if (!nameToAdd) return;
     setActionLoading(true);
     try {
-      await onAdd(newPlayer.trim());
+      await onAdd(nameToAdd);
       setNewPlayer("");
       setAddDialogOpen(false);
     } finally {
@@ -59,7 +107,7 @@ export function WhitelistTable({
     if (!playerToRemove) return;
     setActionLoading(true);
     try {
-      await onRemove(playerToRemove);
+      await onRemove(playerToRemove.name);
       setPlayerToRemove(null);
       setRemoveDialogOpen(false);
     } finally {
@@ -94,20 +142,57 @@ export function WhitelistTable({
                 Entrez le nom du joueur Minecraft à ajouter à la whitelist.
               </DialogDescription>
             </DialogHeader>
-            <Input
-              placeholder="Nom du joueur"
-              value={newPlayer}
-              onChange={(e) => setNewPlayer(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleAdd()}
-            />
+
+            {/* Player preview */}
+            <div className="flex items-center gap-4 p-4 rounded-lg bg-muted/50">
+              {playerLookup.loading ? (
+                <div className="w-12 h-12 bg-muted rounded animate-pulse" />
+              ) : playerLookup.data ? (
+                <PlayerAvatar uuid={playerLookup.data.uuid} username={playerLookup.data.name} size={48} />
+              ) : (
+                <div className="w-12 h-12 bg-muted rounded flex items-center justify-center">
+                  <span className="text-2xl text-muted-foreground">?</span>
+                </div>
+              )}
+              <div className="flex-1">
+                <Input
+                  placeholder="Nom du joueur"
+                  value={newPlayer}
+                  onChange={(e) => setNewPlayer(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && !playerLookup.loading && playerLookup.data && handleAdd()}
+                />
+                {playerLookup.loading && (
+                  <p className="text-xs text-muted-foreground mt-1">Recherche du joueur...</p>
+                )}
+                {playerLookup.error && newPlayer.length >= 3 && (
+                  <p className="text-xs text-destructive mt-1 flex items-center gap-1">
+                    <X className="w-3 h-3" />
+                    Joueur introuvable
+                  </p>
+                )}
+                {playerLookup.data && (
+                  <p className="text-xs text-green-500 mt-1 flex items-center gap-1">
+                    <Check className="w-3 h-3" />
+                    {playerLookup.data.name}
+                  </p>
+                )}
+              </div>
+            </div>
+
             <DialogFooter>
               <Button
                 variant="outline"
-                onClick={() => setAddDialogOpen(false)}
+                onClick={() => {
+                  setAddDialogOpen(false);
+                  setNewPlayer("");
+                }}
               >
                 Annuler
               </Button>
-              <Button onClick={handleAdd} disabled={actionLoading || !newPlayer.trim()}>
+              <Button
+                onClick={handleAdd}
+                disabled={actionLoading || !newPlayer.trim() || playerLookup.loading || (newPlayer.length >= 3 && playerLookup.error)}
+              >
                 {actionLoading ? "Ajout..." : "Ajouter"}
               </Button>
             </DialogFooter>
@@ -140,8 +225,13 @@ export function WhitelistTable({
               </tr>
             ) : (
               filteredPlayers.map((player) => (
-                <tr key={player.uuid || player.name} className="border-b last:border-0">
-                  <td className="px-4 py-3 font-medium">{player.name}</td>
+                <tr key={player.uuid || player.name} className="border-b last:border-0 hover:bg-muted/30">
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-3">
+                      <PlayerAvatar uuid={player.uuid} username={player.name} size={32} />
+                      <span className="font-medium">{player.name}</span>
+                    </div>
+                  </td>
                   <td className="px-4 py-3 text-sm text-muted-foreground font-mono">
                     {player.uuid || "N/A"}
                   </td>
@@ -151,7 +241,7 @@ export function WhitelistTable({
                       size="icon"
                       className="text-destructive hover:text-destructive"
                       onClick={() => {
-                        setPlayerToRemove(player.name);
+                        setPlayerToRemove(player);
                         setRemoveDialogOpen(true);
                       }}
                     >
@@ -177,10 +267,20 @@ export function WhitelistTable({
           <DialogHeader>
             <DialogTitle>Supprimer le joueur</DialogTitle>
             <DialogDescription>
-              Êtes-vous sûr de vouloir retirer <strong>{playerToRemove}</strong>{" "}
-              de la whitelist ?
+              Êtes-vous sûr de vouloir retirer ce joueur de la whitelist ?
             </DialogDescription>
           </DialogHeader>
+
+          {playerToRemove && (
+            <div className="flex items-center gap-4 p-4 rounded-lg bg-muted/50">
+              <PlayerAvatar uuid={playerToRemove.uuid} username={playerToRemove.name} size={48} />
+              <div>
+                <p className="font-medium">{playerToRemove.name}</p>
+                <p className="text-xs text-muted-foreground font-mono">{playerToRemove.uuid || "N/A"}</p>
+              </div>
+            </div>
+          )}
+
           <DialogFooter>
             <Button
               variant="outline"

@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { WhitelistTable } from "@/components/whitelist-table";
 import { Button } from "@/components/ui/button";
-import { RefreshCw } from "lucide-react";
+import { RefreshCw, Shield, ShieldOff } from "lucide-react";
 
 interface Player {
   uuid: string;
@@ -12,7 +12,9 @@ interface Player {
 
 export default function WhitelistPage() {
   const [players, setPlayers] = useState<Player[]>([]);
+  const [enabled, setEnabled] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [toggling, setToggling] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const fetchWhitelist = useCallback(async () => {
@@ -25,6 +27,7 @@ export default function WhitelistPage() {
       }
       const data = await response.json();
       setPlayers(data.players);
+      setEnabled(data.enabled ?? false);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unknown error");
     } finally {
@@ -35,6 +38,29 @@ export default function WhitelistPage() {
   useEffect(() => {
     fetchWhitelist();
   }, [fetchWhitelist]);
+
+  const handleToggle = async () => {
+    setToggling(true);
+    try {
+      const response = await fetch("/api/whitelist", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enabled: !enabled }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || "Failed to toggle whitelist");
+      }
+
+      const data = await response.json();
+      setEnabled(data.enabled);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unknown error");
+    } finally {
+      setToggling(false);
+    }
+  };
 
   const handleAdd = async (name: string) => {
     const response = await fetch("/api/whitelist", {
@@ -78,10 +104,54 @@ export default function WhitelistPage() {
             Gérez les joueurs autorisés à rejoindre le serveur
           </p>
         </div>
-        <Button variant="outline" size="icon" onClick={fetchWhitelist}>
-          <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-        </Button>
+        <div className="flex items-center gap-2">
+          {/* Whitelist toggle */}
+          <Button
+            variant={enabled ? "default" : "outline"}
+            onClick={handleToggle}
+            disabled={toggling || loading}
+            className="gap-2"
+          >
+            {enabled ? (
+              <>
+                <Shield className="h-4 w-4" />
+                Whitelist activée
+              </>
+            ) : (
+              <>
+                <ShieldOff className="h-4 w-4" />
+                Whitelist désactivée
+              </>
+            )}
+          </Button>
+          <Button variant="outline" size="icon" onClick={fetchWhitelist}>
+            <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+          </Button>
+        </div>
       </div>
+
+      {/* Status banner */}
+      {!loading && (
+        <div
+          className={`rounded-md p-3 text-sm flex items-center gap-2 ${
+            enabled
+              ? "bg-green-500/10 text-green-600 dark:text-green-400"
+              : "bg-yellow-500/10 text-yellow-600 dark:text-yellow-400"
+          }`}
+        >
+          {enabled ? (
+            <>
+              <Shield className="h-4 w-4" />
+              La whitelist est activée. Seuls les joueurs de la liste peuvent rejoindre le serveur.
+            </>
+          ) : (
+            <>
+              <ShieldOff className="h-4 w-4" />
+              La whitelist est désactivée. Tous les joueurs peuvent rejoindre le serveur.
+            </>
+          )}
+        </div>
+      )}
 
       {/* Error */}
       {error && (

@@ -163,7 +163,11 @@ export default function ConsolePage() {
       )}
 
       {/* Command Input */}
-      <ConsoleInput onSend={handleCommand} disabled={!status?.online} />
+      <ConsoleInput
+        onSend={handleCommand}
+        disabled={!status?.online}
+        onlinePlayers={status?.players?.list || []}
+      />
 
       {!status?.online && (
         <p className="text-sm text-muted-foreground">
