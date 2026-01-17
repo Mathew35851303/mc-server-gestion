@@ -19,6 +19,9 @@ import {
   Sparkles,
   Filter,
   X,
+  Copy,
+  ExternalLink,
+  FileJson,
 } from "lucide-react";
 import { useToast } from "@/components/ui/toaster";
 
@@ -60,6 +63,18 @@ interface InstallationState {
   shaders: ShaderProgress[];
 }
 
+interface ShaderManifest {
+  version: string;
+  minecraft_version: string;
+  last_updated: string;
+  shaders: Array<{
+    filename: string;
+    size: number;
+    sha256: string;
+    url: string;
+  }>;
+}
+
 export default function ShadersPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
@@ -73,6 +88,8 @@ export default function ShadersPage() {
     shaders: [],
   });
   const [installedFilter, setInstalledFilter] = useState("");
+  const [manifest, setManifest] = useState<ShaderManifest | null>(null);
+  const [manifestLoading, setManifestLoading] = useState(false);
   const toast = useToast();
 
   // Filter installed shaders
@@ -95,9 +112,26 @@ export default function ShadersPage() {
     }
   }, []);
 
+  // Fetch manifest
+  const fetchManifest = useCallback(async () => {
+    setManifestLoading(true);
+    try {
+      const response = await fetch("/api/manifest/shaders");
+      if (response.ok) {
+        const data = await response.json();
+        setManifest(data);
+      }
+    } catch (error) {
+      console.error("Failed to fetch manifest:", error);
+    } finally {
+      setManifestLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     fetchInstalledShaders();
-  }, [fetchInstalledShaders]);
+    fetchManifest();
+  }, [fetchInstalledShaders, fetchManifest]);
 
   // Search for shaders
   const handleSearch = async () => {
@@ -181,6 +215,7 @@ export default function ShadersPage() {
       if (response.ok) {
         toast.success(`${filename} supprimé`);
         await fetchInstalledShaders();
+        await fetchManifest();
       } else {
         const data = await response.json();
         toast.error(data.error || "Erreur lors de la suppression");
@@ -274,6 +309,7 @@ export default function ShadersPage() {
               setShadersToInstall([]);
               toast.success(data.message);
               await fetchInstalledShaders();
+              await fetchManifest();
               break;
 
             case "error":
@@ -303,6 +339,27 @@ export default function ShadersPage() {
   };
 
   const isShaderInList = (shaderId: string) => shadersToInstall.some((s) => s.id === shaderId);
+
+  const copyManifestUrl = () => {
+    const url = `${window.location.origin}/api/manifest/shaders`;
+    navigator.clipboard.writeText(url);
+    toast.success("URL du manifest copiée !");
+  };
+
+  const getTotalSize = () => {
+    if (!manifest) return 0;
+    return manifest.shaders.reduce((acc, shader) => acc + shader.size, 0);
+  };
+
+  const formatDate = (dateStr: string) => {
+    return new Date(dateStr).toLocaleDateString("fr-FR", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
 
   const getStatusIcon = (status: ShaderProgress["status"]) => {
     switch (status) {
@@ -606,6 +663,81 @@ export default function ShadersPage() {
               Les joueurs doivent installer les shaders côté client
             </p>
           )}
+        </CardContent>
+      </Card>
+
+      {/* Manifest Launcher Section */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <FileJson className="h-5 w-5" />
+            Manifest Launcher
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            Utilisez ce manifest pour synchroniser automatiquement les shaders avec votre launcher.
+          </p>
+
+          {/* URL Copy Section */}
+          <div className="flex gap-2">
+            <Input
+              value={typeof window !== "undefined" ? `${window.location.origin}/api/manifest/shaders` : "/api/manifest/shaders"}
+              readOnly
+              className="font-mono text-sm"
+            />
+            <Button variant="outline" size="icon" onClick={copyManifestUrl}>
+              <Copy className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => window.open("/api/manifest/shaders", "_blank")}
+            >
+              <ExternalLink className="h-4 w-4" />
+            </Button>
+          </div>
+
+          {/* Stats Grid */}
+          {manifestLoading ? (
+            <div className="flex justify-center py-4">
+              <RefreshCw className="h-5 w-5 animate-spin text-muted-foreground" />
+            </div>
+          ) : manifest ? (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="p-3 rounded-lg bg-muted/50 text-center">
+                <div className="text-2xl font-bold">{manifest.shaders.length}</div>
+                <div className="text-xs text-muted-foreground">Shaders</div>
+              </div>
+              <div className="p-3 rounded-lg bg-muted/50 text-center">
+                <div className="text-2xl font-bold">{formatBytes(getTotalSize())}</div>
+                <div className="text-xs text-muted-foreground">Taille totale</div>
+              </div>
+              <div className="p-3 rounded-lg bg-muted/50 text-center">
+                <div className="text-2xl font-bold">{manifest.minecraft_version}</div>
+                <div className="text-xs text-muted-foreground">Version MC</div>
+              </div>
+              <div className="p-3 rounded-lg bg-muted/50 text-center">
+                <div className="text-lg font-bold">{formatDate(manifest.last_updated)}</div>
+                <div className="text-xs text-muted-foreground">Dernière MAJ</div>
+              </div>
+            </div>
+          ) : null}
+
+          {/* Refresh Button */}
+          <Button
+            variant="outline"
+            onClick={fetchManifest}
+            disabled={manifestLoading}
+            className="w-full gap-2"
+          >
+            <RefreshCw className={`h-4 w-4 ${manifestLoading ? "animate-spin" : ""}`} />
+            Rafraîchir le manifest
+          </Button>
+
+          <p className="text-xs text-muted-foreground text-center">
+            L&apos;endpoint <code className="bg-muted px-1 rounded">/api/manifest/shaders</code> est public pour permettre l&apos;accès depuis le launcher
+          </p>
         </CardContent>
       </Card>
     </div>
