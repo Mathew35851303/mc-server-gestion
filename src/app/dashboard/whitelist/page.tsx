@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { WhitelistTable } from "@/components/whitelist-table";
 import { Button } from "@/components/ui/button";
 import { RefreshCw, Shield, ShieldOff } from "lucide-react";
+import { useToast } from "@/components/ui/toaster";
 
 interface Player {
   uuid: string;
@@ -15,11 +16,10 @@ export default function WhitelistPage() {
   const [enabled, setEnabled] = useState(false);
   const [loading, setLoading] = useState(true);
   const [toggling, setToggling] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const toast = useToast();
 
   const fetchWhitelist = useCallback(async () => {
     setLoading(true);
-    setError(null);
     try {
       const response = await fetch("/api/whitelist");
       if (!response.ok) {
@@ -28,12 +28,12 @@ export default function WhitelistPage() {
       const data = await response.json();
       setPlayers(data.players);
       setEnabled(data.enabled ?? false);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Unknown error");
+    } catch {
+      toast.error("Erreur lors du chargement de la whitelist");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [toast]);
 
   useEffect(() => {
     fetchWhitelist();
@@ -55,8 +55,9 @@ export default function WhitelistPage() {
 
       const data = await response.json();
       setEnabled(data.enabled);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Unknown error");
+      toast.success(data.enabled ? "Whitelist activée" : "Whitelist désactivée");
+    } catch {
+      toast.error("Erreur lors de la modification de la whitelist");
     } finally {
       setToggling(false);
     }
@@ -71,10 +72,11 @@ export default function WhitelistPage() {
 
     if (!response.ok) {
       const data = await response.json();
+      toast.error(data.error || "Erreur lors de l'ajout du joueur");
       throw new Error(data.error || "Failed to add player");
     }
 
-    // Refresh the list
+    toast.success(`${name} ajouté à la whitelist`);
     await fetchWhitelist();
   };
 
@@ -87,10 +89,11 @@ export default function WhitelistPage() {
 
     if (!response.ok) {
       const data = await response.json();
+      toast.error(data.error || "Erreur lors de la suppression du joueur");
       throw new Error(data.error || "Failed to remove player");
     }
 
-    // Refresh the list
+    toast.success(`${name} retiré de la whitelist`);
     await fetchWhitelist();
   };
 
@@ -150,13 +153,6 @@ export default function WhitelistPage() {
               La whitelist est désactivée. Tous les joueurs peuvent rejoindre le serveur.
             </>
           )}
-        </div>
-      )}
-
-      {/* Error */}
-      {error && (
-        <div className="rounded-md bg-destructive/10 p-4 text-destructive">
-          {error}
         </div>
       )}
 

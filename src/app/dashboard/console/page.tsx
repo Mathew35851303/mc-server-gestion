@@ -7,13 +7,14 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { RefreshCw, Pause, Play, Trash2 } from "lucide-react";
 import { useServerStatus } from "@/hooks/use-server-status";
+import { useToast } from "@/components/ui/toaster";
 
 export default function ConsolePage() {
   const [logs, setLogs] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [streaming, setStreaming] = useState(true);
-  const [commandResponse, setCommandResponse] = useState<string | null>(null);
   const { status } = useServerStatus(10000);
+  const toast = useToast();
 
   const fetchLogs = useCallback(async () => {
     try {
@@ -69,7 +70,6 @@ export default function ConsolePage() {
   }, [streaming, status?.online]);
 
   const handleCommand = async (command: string) => {
-    setCommandResponse(null);
     try {
       const response = await fetch("/api/server/command", {
         method: "POST",
@@ -80,15 +80,14 @@ export default function ConsolePage() {
       const data = await response.json();
 
       if (response.ok) {
-        setCommandResponse(data.response);
         // Add command to local logs
         setLogs((prev) => [...prev, `> ${command}`, data.response]);
+        toast.info(`Commande exécutée: ${command}`);
       } else {
-        setCommandResponse(`Erreur: ${data.error}`);
+        toast.error(data.error || "Erreur lors de l'exécution de la commande");
       }
-    } catch (error) {
-      setCommandResponse("Erreur de connexion au serveur");
-      console.error("Command error:", error);
+    } catch {
+      toast.error("Erreur de connexion au serveur");
     }
   };
 
@@ -152,14 +151,6 @@ export default function ConsolePage() {
         </div>
       ) : (
         <ConsoleOutput logs={logs} autoScroll={streaming} />
-      )}
-
-      {/* Command Response */}
-      {commandResponse && (
-        <div className="rounded-md border bg-secondary/50 p-3 font-mono text-sm">
-          <span className="text-muted-foreground">Réponse: </span>
-          {commandResponse}
-        </div>
       )}
 
       {/* Command Input */}

@@ -7,6 +7,8 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { RefreshCw, Save, AlertTriangle } from "lucide-react";
+import { ServerIconUpload } from "@/components/server-icon-upload";
+import { useToast } from "@/components/ui/toaster";
 
 interface ServerProperty {
   key: string;
@@ -41,10 +43,7 @@ export default function SettingsPage() {
   const [modified, setModified] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState<{
-    type: "success" | "error";
-    text: string;
-  } | null>(null);
+  const toast = useToast();
 
   useEffect(() => {
     fetchSettings();
@@ -77,7 +76,6 @@ export default function SettingsPage() {
 
   const handleSave = async () => {
     setSaving(true);
-    setMessage(null);
 
     try {
       const response = await fetch("/api/settings", {
@@ -89,14 +87,14 @@ export default function SettingsPage() {
       const data = await response.json();
 
       if (response.ok) {
-        setMessage({ type: "success", text: data.message });
+        toast.success("Paramètres sauvegardés. Redémarrez le serveur pour appliquer.");
         setModified({});
         await fetchSettings();
       } else {
-        setMessage({ type: "error", text: data.error });
+        toast.error(data.error || "Erreur lors de la sauvegarde");
       }
     } catch {
-      setMessage({ type: "error", text: "Erreur lors de la sauvegarde" });
+      toast.error("Erreur lors de la sauvegarde");
     } finally {
       setSaving(false);
     }
@@ -162,18 +160,8 @@ export default function SettingsPage() {
         </div>
       </div>
 
-      {/* Messages */}
-      {message && (
-        <div
-          className={`rounded-md p-4 ${
-            message.type === "success"
-              ? "bg-primary/10 text-primary"
-              : "bg-destructive/10 text-destructive"
-          }`}
-        >
-          {message.text}
-        </div>
-      )}
+      {/* Server Icon */}
+      <ServerIconUpload />
 
       {/* Settings by category */}
       <div className="space-y-6">

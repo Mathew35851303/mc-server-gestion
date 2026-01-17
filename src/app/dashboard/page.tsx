@@ -8,10 +8,18 @@ import { CpuUsageCard } from "@/components/cpu-usage-card";
 import { Button } from "@/components/ui/button";
 import { RefreshCw, Play, Square, RotateCw } from "lucide-react";
 import { useState } from "react";
+import { useToast } from "@/components/ui/toaster";
 
 export default function DashboardPage() {
   const { status, loading, refetch } = useServerStatus(5000);
   const [controlLoading, setControlLoading] = useState<string | null>(null);
+  const toast = useToast();
+
+  const actionLabels = {
+    start: "Démarrage",
+    stop: "Arrêt",
+    restart: "Redémarrage",
+  };
 
   async function handleControl(action: "start" | "stop" | "restart") {
     setControlLoading(action);
@@ -26,12 +34,15 @@ export default function DashboardPage() {
         throw new Error("Failed to control server");
       }
 
+      toast.success(`${actionLabels[action]} du serveur en cours...`);
+
       // Wait a moment then refresh status
       setTimeout(() => {
         refetch();
       }, 2000);
     } catch (error) {
       console.error("Control error:", error);
+      toast.error(`Erreur lors du ${actionLabels[action].toLowerCase()}`);
     } finally {
       setControlLoading(null);
     }
