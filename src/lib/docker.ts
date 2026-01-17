@@ -101,6 +101,25 @@ export async function restartContainer(): Promise<void> {
   await container.restart();
 }
 
+// Strip ANSI escape codes and terminal control characters
+function stripAnsi(str: string): string {
+  return str
+    // Remove ANSI escape codes (colors, cursor movement, etc.)
+    .replace(/\x1b\[[0-9;]*[a-zA-Z]/g, "")
+    // Remove other escape sequences
+    .replace(/\x1b[=?]?[0-9]*[a-zA-Z]/g, "")
+    // Remove carriage returns
+    .replace(/\r/g, "")
+    // Remove the ">....\" pattern and variations (Minecraft TTY prompt)
+    .replace(/>\.+\s*/g, "")
+    // Remove standalone [K escape sequence leftovers
+    .replace(/\[K/g, "")
+    // Clean up multiple empty lines
+    .replace(/\n{3,}/g, "\n\n")
+    // Clean up lines that are now empty or just whitespace
+    .replace(/^\s*\n/gm, "\n");
+}
+
 export async function getContainerLogs(tail: number = 100): Promise<string> {
   try {
     const container = await getContainer();
@@ -114,15 +133,21 @@ export async function getContainerLogs(tail: number = 100): Promise<string> {
       timestamps: true,
     });
 
+    let rawLogs: string;
+
     // Handle buffer or string response
     if (Buffer.isBuffer(logs)) {
       // If TTY is enabled, logs are not multiplexed
       if (isTty) {
-        return logs.toString("utf-8");
+        rawLogs = logs.toString("utf-8");
+      } else {
+        rawLogs = demuxDockerLogs(logs);
       }
-      return demuxDockerLogs(logs);
+    } else {
+      rawLogs = String(logs);
     }
-    return String(logs);
+
+    return stripAnsi(rawLogs);
   } catch (error) {
     console.error("Error getting container logs:", error);
     return "";

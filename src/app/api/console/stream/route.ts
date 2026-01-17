@@ -5,6 +5,17 @@ import { Duplex } from "stream";
 
 export const dynamic = "force-dynamic";
 
+// Strip ANSI escape codes and terminal control characters
+function stripAnsi(str: string): string {
+  return str
+    .replace(/\x1b\[[0-9;]*[a-zA-Z]/g, "")
+    .replace(/\x1b[=?]?[0-9]*[a-zA-Z]/g, "")
+    .replace(/\r/g, "")
+    .replace(/>\.+\s*/g, "")
+    .replace(/\[K/g, "")
+    .trim();
+}
+
 export async function GET() {
   const session = await auth();
   if (!session) {
@@ -31,7 +42,10 @@ export async function GET() {
     const stream = new ReadableStream({
       start(controller) {
         const sendData = (data: string) => {
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ log: data })}\n\n`));
+          const cleaned = stripAnsi(data);
+          if (cleaned) {
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ log: cleaned })}\n\n`));
+          }
         };
 
         if (isTty) {
