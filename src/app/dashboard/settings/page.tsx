@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectOption } from "@/components/ui/select";
 import { RefreshCw, Save, AlertTriangle } from "lucide-react";
 import { ServerIconUpload } from "@/components/server-icon-upload";
 import { useToast } from "@/components/ui/toaster";
@@ -195,15 +196,15 @@ export default function SettingsPage() {
                         </p>
                       )}
                       {prop.type === "boolean" ? (
-                        <select
+                        <Select
                           id={prop.key}
                           value={getValue(prop)}
                           onChange={(e) => handleChange(prop.key, e.target.value)}
-                          className="flex h-9 w-full max-w-xs rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                          className="max-w-xs"
                         >
-                          <option value="true">true</option>
-                          <option value="false">false</option>
-                        </select>
+                          <SelectOption value="true">true</SelectOption>
+                          <SelectOption value="false">false</SelectOption>
+                        </Select>
                       ) : (
                         <Input
                           id={prop.key}
