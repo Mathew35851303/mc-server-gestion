@@ -23,7 +23,7 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - mc-admin-data:/app/data
-      - minecraft-forge_minecraft-data:/minecraft-data:ro
+      - minecraft-forge_minecraft-data:/minecraft-data
     restart: unless-stopped
 
 networks:
