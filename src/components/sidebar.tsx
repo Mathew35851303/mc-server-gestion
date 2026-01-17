@@ -11,6 +11,7 @@ import {
   LogOut,
   Server,
   Package,
+  Box,
 } from "lucide-react";
 import { signOut } from "next-auth/react";
 import { cn } from "@/lib/utils";
@@ -22,6 +23,7 @@ const navigation = [
   { name: "Console", href: "/dashboard/console", icon: Terminal },
   { name: "Whitelist", href: "/dashboard/whitelist", icon: Users },
   { name: "Resource Packs", href: "/dashboard/resourcepacks", icon: Package },
+  { name: "Mods", href: "/dashboard/mods", icon: Box },
   { name: "Paramètres", href: "/dashboard/settings", icon: Settings },
   { name: "Contrôle", href: "/dashboard/control", icon: Power },
 ];
