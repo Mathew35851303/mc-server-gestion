@@ -17,6 +17,7 @@ import {
   Loader2,
   FolderOpen,
   AlertTriangle,
+  Link2,
 } from "lucide-react";
 import { useToast } from "@/components/ui/toaster";
 
@@ -29,6 +30,24 @@ interface SearchResult {
   categories: string[];
 }
 
+interface ModDependency {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+  file: {
+    url: string;
+    filename: string;
+    size: number;
+    sha1: string;
+  };
+  version: {
+    id: string;
+    name: string;
+    number: string;
+  };
+}
+
 interface ModToInstall {
   id: string;
   name: string;
@@ -36,6 +55,8 @@ interface ModToInstall {
   downloadUrl: string;
   filename: string;
   size: number;
+  isDependency?: boolean;
+  requiredBy?: string;
 }
 
 interface InstalledMod {
@@ -135,19 +156,49 @@ export default function ModsPage() {
         return;
       }
 
-      setModsToInstall((prev) => [
-        ...prev,
-        {
-          id: details.id,
-          name: details.name,
-          icon: details.icon,
-          downloadUrl: details.file.url,
-          filename: details.file.filename,
-          size: details.file.size,
-        },
-      ]);
+      const modsToAdd: ModToInstall[] = [];
 
-      toast.success(`${mod.name} ajouté à la liste`);
+      // Add the main mod
+      modsToAdd.push({
+        id: details.id,
+        name: details.name,
+        icon: details.icon,
+        downloadUrl: details.file.url,
+        filename: details.file.filename,
+        size: details.file.size,
+      });
+
+      // Add dependencies
+      const dependencies: ModDependency[] = details.dependencies || [];
+      const addedDeps: string[] = [];
+
+      for (const dep of dependencies) {
+        // Check if dependency is already in list or installed
+        const isInList = modsToInstall.some((m) => m.id === dep.id);
+        const isInstalled = installedMods.some((m) => m.filename === dep.file.filename);
+
+        if (!isInList && !isInstalled && !modsToAdd.some((m) => m.id === dep.id)) {
+          modsToAdd.push({
+            id: dep.id,
+            name: dep.name,
+            icon: dep.icon,
+            downloadUrl: dep.file.url,
+            filename: dep.file.filename,
+            size: dep.file.size,
+            isDependency: true,
+            requiredBy: details.name,
+          });
+          addedDeps.push(dep.name);
+        }
+      }
+
+      setModsToInstall((prev) => [...prev, ...modsToAdd]);
+
+      if (addedDeps.length > 0) {
+        toast.success(`${mod.name} + ${addedDeps.length} dépendance(s) ajoutés`);
+      } else {
+        toast.success(`${mod.name} ajouté à la liste`);
+      }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Erreur lors de l'ajout");
       console.error("Add error:", error);
@@ -463,7 +514,9 @@ export default function ModsPage() {
               {modsToInstall.map((mod) => (
                 <div
                   key={mod.id}
-                  className="flex items-center gap-3 p-3 rounded-lg border"
+                  className={`flex items-center gap-3 p-3 rounded-lg border ${
+                    mod.isDependency ? "bg-muted/30 border-dashed" : ""
+                  }`}
                 >
                   {mod.icon ? (
                     <img src={mod.icon} alt={mod.name} className="w-10 h-10 rounded" />
@@ -473,9 +526,20 @@ export default function ModsPage() {
                     </div>
                   )}
                   <div className="flex-1 min-w-0">
-                    <span className="font-medium">{mod.name}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium">{mod.name}</span>
+                      {mod.isDependency && (
+                        <Badge variant="outline" className="text-xs gap-1">
+                          <Link2 className="h-3 w-3" />
+                          Dépendance
+                        </Badge>
+                      )}
+                    </div>
                     <div className="text-xs text-muted-foreground">
                       {mod.filename} • {formatBytes(mod.size)}
+                      {mod.requiredBy && (
+                        <span className="ml-1">• Requis par {mod.requiredBy}</span>
+                      )}
                     </div>
                   </div>
                   <Button

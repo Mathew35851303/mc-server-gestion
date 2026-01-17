@@ -25,6 +25,69 @@ interface ModrinthVersion {
   }[];
 }
 
+interface ModrinthProject {
+  slug: string;
+  title: string;
+  description: string;
+  icon_url: string;
+  downloads: number;
+  categories: string[];
+}
+
+interface DependencyInfo {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+  file: {
+    url: string;
+    filename: string;
+    size: number;
+    sha1: string;
+  };
+  version: {
+    id: string;
+    name: string;
+    number: string;
+  };
+}
+
+async function fetchProjectDetails(projectId: string): Promise<ModrinthProject | null> {
+  try {
+    const res = await fetch(`${MODRINTH_API}/project/${projectId}`, {
+      headers: {
+        "User-Agent": "mc-admin-panel/1.0.0 (contact@example.com)",
+      },
+    });
+    if (!res.ok) return null;
+    return res.json();
+  } catch {
+    return null;
+  }
+}
+
+async function fetchProjectVersion(
+  projectId: string,
+  gameVersion: string,
+  loader: string
+): Promise<ModrinthVersion | null> {
+  try {
+    const res = await fetch(
+      `${MODRINTH_API}/project/${projectId}/version?game_versions=["${gameVersion}"]&loaders=["${loader}"]`,
+      {
+        headers: {
+          "User-Agent": "mc-admin-panel/1.0.0 (contact@example.com)",
+        },
+      }
+    );
+    if (!res.ok) return null;
+    const versions: ModrinthVersion[] = await res.json();
+    return versions[0] || null;
+  } catch {
+    return null;
+  }
+}
+
 // GET - Get mod details and download URL
 export async function GET(
   request: NextRequest,
@@ -81,10 +144,53 @@ export async function GET(
     const primaryFile =
       latestVersion.files.find((f) => f.primary) || latestVersion.files[0];
 
-    // Get required dependencies
+    // Get required dependencies with full details
     const requiredDeps = latestVersion.dependencies.filter(
       (d) => d.dependency_type === "required"
     );
+
+    const dependenciesWithDetails: DependencyInfo[] = [];
+
+    // Fetch details for each dependency in parallel
+    if (requiredDeps.length > 0) {
+      const depPromises = requiredDeps.map(async (dep) => {
+        const [depProject, depVersion] = await Promise.all([
+          fetchProjectDetails(dep.project_id),
+          fetchProjectVersion(dep.project_id, gameVersion, loader),
+        ]);
+
+        if (depProject && depVersion) {
+          const depFile =
+            depVersion.files.find((f) => f.primary) || depVersion.files[0];
+
+          if (depFile) {
+            return {
+              id: depProject.slug,
+              name: depProject.title,
+              description: depProject.description,
+              icon: depProject.icon_url,
+              file: {
+                url: depFile.url,
+                filename: depFile.filename,
+                size: depFile.size,
+                sha1: depFile.hashes.sha1,
+              },
+              version: {
+                id: depVersion.id,
+                name: depVersion.name,
+                number: depVersion.version_number,
+              },
+            };
+          }
+        }
+        return null;
+      });
+
+      const results = await Promise.all(depPromises);
+      dependenciesWithDetails.push(
+        ...results.filter((d): d is DependencyInfo => d !== null)
+      );
+    }
 
     return NextResponse.json({
       id: project.slug,
@@ -106,7 +212,7 @@ export async function GET(
         size: primaryFile.size,
         sha1: primaryFile.hashes.sha1,
       },
-      dependencies: requiredDeps.map((d) => d.project_id),
+      dependencies: dependenciesWithDetails,
     });
   } catch (error) {
     console.error("Error fetching mod:", error);
