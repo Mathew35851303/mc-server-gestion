@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -12,7 +12,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Trash2, UserPlus, Search, Check, X } from "lucide-react";
+import { Trash2, UserPlus, Search } from "lucide-react";
 import { PlayerAvatar } from "@/components/player-avatar";
 
 interface Player {
@@ -25,50 +25,6 @@ interface WhitelistTableProps {
   onAdd: (name: string) => Promise<void>;
   onRemove: (name: string) => Promise<void>;
   loading?: boolean;
-}
-
-// Hook to lookup player UUID from Mojang API
-function usePlayerLookup(username: string) {
-  const [data, setData] = useState<{ uuid: string; name: string } | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(false);
-
-  useEffect(() => {
-    if (!username || username.length < 3) {
-      setData(null);
-      setError(false);
-      return;
-    }
-
-    const timeout = setTimeout(() => {
-      setLoading(true);
-      setError(false);
-
-      fetch(`https://api.mojang.com/users/profiles/minecraft/${username}`)
-        .then((res) => {
-          if (!res.ok) throw new Error("Player not found");
-          return res.json();
-        })
-        .then((result) => {
-          const uuid = formatUuid(result.id);
-          setData({ uuid, name: result.name });
-        })
-        .catch(() => {
-          setData(null);
-          setError(true);
-        })
-        .finally(() => setLoading(false));
-    }, 500); // Debounce
-
-    return () => clearTimeout(timeout);
-  }, [username]);
-
-  return { data, loading, error };
-}
-
-function formatUuid(uuid: string): string {
-  if (uuid.includes("-")) return uuid;
-  return `${uuid.slice(0, 8)}-${uuid.slice(8, 12)}-${uuid.slice(12, 16)}-${uuid.slice(16, 20)}-${uuid.slice(20)}`;
 }
 
 export function WhitelistTable({
@@ -84,14 +40,12 @@ export function WhitelistTable({
   const [playerToRemove, setPlayerToRemove] = useState<Player | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
 
-  const playerLookup = usePlayerLookup(newPlayer);
-
   const filteredPlayers = players.filter((p) =>
     p.name.toLowerCase().includes(search.toLowerCase())
   );
 
   const handleAdd = async () => {
-    const nameToAdd = playerLookup.data?.name || newPlayer.trim();
+    const nameToAdd = newPlayer.trim();
     if (!nameToAdd) return;
     setActionLoading(true);
     try {
@@ -145,37 +99,17 @@ export function WhitelistTable({
 
             {/* Player preview */}
             <div className="flex items-center gap-4 p-4 rounded-lg bg-muted/50">
-              {playerLookup.loading ? (
-                <div className="w-12 h-12 bg-muted rounded animate-pulse" />
-              ) : playerLookup.data ? (
-                <PlayerAvatar uuid={playerLookup.data.uuid} username={playerLookup.data.name} size={48} />
-              ) : (
-                <div className="w-12 h-12 bg-muted rounded flex items-center justify-center">
-                  <span className="text-2xl text-muted-foreground">?</span>
-                </div>
-              )}
+              <PlayerAvatar username={newPlayer.trim() || undefined} size={48} />
               <div className="flex-1">
                 <Input
                   placeholder="Nom du joueur"
                   value={newPlayer}
                   onChange={(e) => setNewPlayer(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && !playerLookup.loading && playerLookup.data && handleAdd()}
+                  onKeyDown={(e) => e.key === "Enter" && newPlayer.trim() && handleAdd()}
                 />
-                {playerLookup.loading && (
-                  <p className="text-xs text-muted-foreground mt-1">Recherche du joueur...</p>
-                )}
-                {playerLookup.error && newPlayer.length >= 3 && (
-                  <p className="text-xs text-destructive mt-1 flex items-center gap-1">
-                    <X className="w-3 h-3" />
-                    Joueur introuvable
-                  </p>
-                )}
-                {playerLookup.data && (
-                  <p className="text-xs text-green-500 mt-1 flex items-center gap-1">
-                    <Check className="w-3 h-3" />
-                    {playerLookup.data.name}
-                  </p>
-                )}
+                <p className="text-xs text-muted-foreground mt-1">
+                  L'avatar s'affichera automatiquement si le joueur existe
+                </p>
               </div>
             </div>
 
@@ -191,7 +125,7 @@ export function WhitelistTable({
               </Button>
               <Button
                 onClick={handleAdd}
-                disabled={actionLoading || !newPlayer.trim() || playerLookup.loading || (newPlayer.length >= 3 && playerLookup.error)}
+                disabled={actionLoading || !newPlayer.trim()}
               >
                 {actionLoading ? "Ajout..." : "Ajouter"}
               </Button>
