@@ -200,8 +200,7 @@ export default function ControlPage() {
           </CardHeader>
           <CardContent>
             <Button
-              variant="secondary"
-              className="w-full gap-2"
+              className="w-full gap-2 bg-orange-500 hover:bg-orange-600 text-white"
               disabled={!status?.online || actionLoading !== null}
               onClick={() => handleAction("restart")}
             >

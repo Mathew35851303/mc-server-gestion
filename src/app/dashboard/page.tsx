@@ -6,7 +6,7 @@ import { PlayerCountCard } from "@/components/player-count-card";
 import { MemoryUsageCard } from "@/components/memory-usage-card";
 import { CpuUsageCard } from "@/components/cpu-usage-card";
 import { Button } from "@/components/ui/button";
-import { RefreshCw, Play, Square, RotateCw } from "lucide-react";
+import { RefreshCw, Play, Square, RotateCw, Newspaper, HardDrive, FolderOpen, ExternalLink } from "lucide-react";
 import { useState } from "react";
 import { useToast } from "@/components/ui/toaster";
 
@@ -124,10 +124,9 @@ export default function DashboardPage() {
                 Arrêter
               </Button>
               <Button
-                variant="secondary"
                 onClick={() => handleControl("restart")}
                 disabled={controlLoading !== null}
-                className="gap-2"
+                className="gap-2 bg-orange-500 hover:bg-orange-600 text-white"
               >
                 {controlLoading === "restart" ? (
                   <RefreshCw className="h-4 w-4 animate-spin" />
@@ -157,6 +156,63 @@ export default function DashboardPage() {
           </div>
         </div>
       )}
+
+      {/* Quick Links */}
+      <div className="rounded-lg border bg-card p-6">
+        <h2 className="mb-4 text-lg font-semibold">Raccourcis</h2>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {/* News Card */}
+          <a
+            href="https://news.losnachoschipies.fr/login"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="group flex items-center gap-4 rounded-lg border border-orange-500/30 bg-orange-500/10 p-4 transition-all hover:border-orange-500 hover:bg-orange-500/20"
+          >
+            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-orange-500/20">
+              <Newspaper className="h-6 w-6 text-orange-500" />
+            </div>
+            <div className="flex-1">
+              <h3 className="font-medium text-orange-500">News</h3>
+              <p className="text-sm text-muted-foreground">Actualités du serveur</p>
+            </div>
+            <ExternalLink className="h-4 w-4 text-orange-500 opacity-0 transition-opacity group-hover:opacity-100" />
+          </a>
+
+          {/* Storage Card */}
+          <a
+            href="https://storage.losnachoschipies.fr/login"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="group flex items-center gap-4 rounded-lg border border-purple-500/30 bg-purple-500/10 p-4 transition-all hover:border-purple-500 hover:bg-purple-500/20"
+          >
+            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-purple-500/20">
+              <HardDrive className="h-6 w-6 text-purple-500" />
+            </div>
+            <div className="flex-1">
+              <h3 className="font-medium text-purple-500">Storage</h3>
+              <p className="text-sm text-muted-foreground">Mods client</p>
+            </div>
+            <ExternalLink className="h-4 w-4 text-purple-500 opacity-0 transition-opacity group-hover:opacity-100" />
+          </a>
+
+          {/* Files Card */}
+          <a
+            href="https://files.losnachoschipies.fr/files/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="group flex items-center gap-4 rounded-lg border border-blue-500/30 bg-blue-500/10 p-4 transition-all hover:border-blue-500 hover:bg-blue-500/20"
+          >
+            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-blue-500/20">
+              <FolderOpen className="h-6 w-6 text-blue-500" />
+            </div>
+            <div className="flex-1">
+              <h3 className="font-medium text-blue-500">Files</h3>
+              <p className="text-sm text-muted-foreground">Fichiers du serveur</p>
+            </div>
+            <ExternalLink className="h-4 w-4 text-blue-500 opacity-0 transition-opacity group-hover:opacity-100" />
+          </a>
+        </div>
+      </div>
     </div>
   );
 }

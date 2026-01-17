@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useState, useCallback, ReactNode } from "react";
+import { createContext, useContext, useState, useCallback, useEffect, ReactNode } from "react";
 import { X, CheckCircle, AlertCircle, Info, AlertTriangle } from "lucide-react";
 
 type ToastType = "success" | "error" | "info" | "warning";
@@ -10,6 +10,7 @@ interface Toast {
   message: string;
   type: ToastType;
   duration?: number;
+  isExiting?: boolean;
 }
 
 interface ToastContextType {
@@ -39,14 +40,25 @@ interface ToastProviderProps {
 export function ToastProvider({ children }: ToastProviderProps) {
   const [toasts, setToasts] = useState<Toast[]>([]);
 
+  // Start exit animation then remove after animation completes
   const removeToast = useCallback((id: string) => {
-    setToasts((prev) => prev.filter((toast) => toast.id !== id));
+    // First, mark as exiting to trigger exit animation
+    setToasts((prev) =>
+      prev.map((toast) =>
+        toast.id === id ? { ...toast, isExiting: true } : toast
+      )
+    );
+
+    // Then remove after animation duration (300ms)
+    setTimeout(() => {
+      setToasts((prev) => prev.filter((toast) => toast.id !== id));
+    }, 300);
   }, []);
 
   const addToast = useCallback(
     (message: string, type: ToastType = "info", duration: number = 4000) => {
       const id = Math.random().toString(36).substring(2, 9);
-      const toast: Toast = { id, message, type, duration };
+      const toast: Toast = { id, message, type, duration, isExiting: false };
 
       setToasts((prev) => [...prev, toast]);
 
@@ -98,7 +110,7 @@ function ToastContainer({ toasts, removeToast }: ToastContainerProps) {
   if (toasts.length === 0) return null;
 
   return (
-    <div className="fixed top-4 right-4 z-50 flex flex-col gap-2 max-w-sm">
+    <div className="fixed top-4 right-4 z-50 flex flex-col gap-2 max-w-sm pointer-events-none">
       {toasts.map((toast) => (
         <ToastItem key={toast.id} toast={toast} onClose={() => removeToast(toast.id)} />
       ))}
@@ -112,6 +124,15 @@ interface ToastItemProps {
 }
 
 function ToastItem({ toast, onClose }: ToastItemProps) {
+  const [isVisible, setIsVisible] = useState(false);
+
+  // Trigger enter animation on mount
+  useEffect(() => {
+    requestAnimationFrame(() => {
+      setIsVisible(true);
+    });
+  }, []);
+
   const icons = {
     success: CheckCircle,
     error: AlertCircle,
@@ -128,9 +149,23 @@ function ToastItem({ toast, onClose }: ToastItemProps) {
 
   const Icon = icons[toast.type];
 
+  // Determine animation state
+  const isExiting = toast.isExiting;
+  const animationClass = isExiting
+    ? "opacity-0 translate-x-full"
+    : isVisible
+    ? "opacity-100 translate-x-0"
+    : "opacity-0 translate-x-full";
+
   return (
     <div
-      className={`flex items-start gap-3 rounded-lg border p-4 shadow-lg backdrop-blur-sm animate-in slide-in-from-right-5 fade-in duration-200 ${styles[toast.type]}`}
+      className={`
+        flex items-start gap-3 rounded-lg border p-4 shadow-lg backdrop-blur-sm
+        pointer-events-auto
+        transition-all duration-300 ease-out
+        ${animationClass}
+        ${styles[toast.type]}
+      `}
     >
       <Icon className="h-5 w-5 shrink-0 mt-0.5" />
       <p className="flex-1 text-sm font-medium">{toast.message}</p>
